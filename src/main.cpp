@@ -16,9 +16,9 @@
 //   Digital output control for charging signal
 //
 // Key Parameters:
-//   CHARGE_SIGNAL_PIN: Pin 3 for charging control
-//   THRESHOLDWATTAGE: 200W power threshold
-//   THRESHOLDTIME: 60 seconds timing threshold
+//   CHARGE_SIGNAL_PIN: Pin 20 for charging control
+//   THRESHOLDWATTAGE: 500W power threshold
+//   THRESHOLDTIME: 300 seconds timing threshold
 //   CHECK_INTERVAL: 1 second monitoring interval
 //
 // Operation Flow:
@@ -49,7 +49,7 @@
 
 #include "../../config.h"
 
-const int THRESHOLDWATTAGE = 200; // Power threshold in watts
+const int THRESHOLDWATTAGE = 500; // Power threshold in watts
 const int THRESHOLDTIME = 300000; // Time threshold in milliseconds
 
 const int CHARGE_SIGNAL_PIN = 20; // Pin for charging signal
@@ -136,10 +136,11 @@ void setup()
     WiFi.enableAP(false);
     // Handle WiFi event
     WiFi.onEvent(WiFiEvent);
+    // WiFi mode station
     WiFi.mode(WIFI_STA);
     // WiFi connect
     WiFi.begin(ssid, password);
-    // wait 60 S before reboot
+    // wait 60 seconds before reboot
     int trying = 60;
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -158,31 +159,35 @@ void setup()
 //
 void loop()
 {
+    static unsigned long DurationCount = 0;    // Duration counter
     static unsigned long lastCheck = 0;        // Last time we checked the power
     const unsigned long CHECK_INTERVAL = 1000; // Check every 1 second
-
+    // Check if it's time to check the power
     if (millis() - lastCheck >= CHECK_INTERVAL)
     {
         lastCheck = millis();
-
+        // Get the power
         int power = getHTTP();
         Serial.print("Power: ");
         Serial.print(power);
         Serial.print(" W  ");
         Serial.print(isCharging);
-        Serial.println(" ");
-
-        // If power is below THRESHOLDWATTAGE, start the below timer
+        if (isCharging)
+        {
+            Serial.print("  Duration: ");
+            Serial.print(DurationCount++);
+        }
+        Serial.println();
+        // test if power is above or below threshold
         if (power >= THRESHOLDWATTAGE)
         {
             // Reset the below timer if power is restored
             powerBelow = 0;
-
+            // If power is above THRESHOLDWATTAGE, start the above timer
             if (powerAbove == 0)
             {
                 powerAbove = millis();
             }
-
             // If power has been above THRESHOLDWATTAGE for THRESHOLDTIME
             // activate charging signal
             if (millis() - powerAbove >= THRESHOLDTIME && !isCharging)
@@ -198,12 +203,12 @@ void loop()
             {
                 powerBelow = millis();
             }
-
             // If power remains below THRESHOLD, deactivate charging signal
             if (millis() - powerBelow >= THRESHOLDTIME && isCharging)
             {
                 digitalWrite(CHARGE_SIGNAL_PIN, LOW);
                 isCharging = false;
+                DurationCount = 0;
                 powerAbove = 0; // Reset the above timer
             }
         }

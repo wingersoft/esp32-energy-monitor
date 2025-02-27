@@ -70,4 +70,4 @@ esp32-energy-monitor/
 Feel free to submit issues or pull requests for enhancements, bug fixes, or additional features!
 
 ## License
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See the [LICENSE](license.txt) file for details.
