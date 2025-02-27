@@ -49,18 +49,15 @@
 
 #include "../../config.h"
 
-const int CHARGE_SIGNAL_PIN = 20; // Pin for charging signal
-
 const int THRESHOLDWATTAGE = 200; // Power threshold in watts
 const int THRESHOLDTIME = 300000; // Time threshold in milliseconds
 
-unsigned long powerAbove = 0; // Time power is above threshold
-unsigned long powerBelow = 0; // Time power is below threshold
-bool isCharging = false;      // Charging status
+const int CHARGE_SIGNAL_PIN = 20; // Pin for charging signal
 
-// Global variables for time
-bool noconnection = false;
-bool StartUp = false;
+unsigned long powerAbove = 0;     // Time power is above threshold
+unsigned long powerBelow = 0;     // Time power is below threshold
+bool isCharging   = false;        // Charging status
+bool noconnection = false;        // WiFi connection status
 
 //
 // WiFi event handler function for handling WiFi events
@@ -100,16 +97,20 @@ int getHTTP()
     // Make a HTTP GET request
     HTTPClient http;
     http.begin(apiUrl);
+    // Send the GET request
     int httpResponseCode = http.GET();
+    // Check for successful response
     if (httpResponseCode == 200)
     {
         // Get the response payload
         String payload = http.getString();
         // Parse JSON
         JsonDocument doc;
+        // Deserialize JSON
         deserializeJson(doc, payload);
-        // Access values
+        // Access the "active_power_w" value
         String active = doc["active_power_w"];
+        // Convert to int and invert sign
         active_power = -active.toInt();
     }
     else
