@@ -2,8 +2,6 @@
 // This code is an ESP32-based controller that manages
 // battery charging based on solar power monitoring.
 //
-// Here are the key components:
-//
 // Core Functionality:
 //   Monitors power consumption via HTTP requests to an API endpoint
 //   Controls charging signal based on power thresholds
@@ -15,27 +13,8 @@
 //   JSON parsing for API responses
 //   Digital output control for charging signal
 //
-// Key Parameters:
-//   CHARGE_SIGNAL_PIN: Pin 20 for charging control
-//   THRESHOLDWATTAGE: 500W power threshold
-//   THRESHOLDTIME: 300 seconds timing threshold
-//   CHECK_INTERVAL: 1 second monitoring interval
-//
-// Operation Flow:
-//   Connects to WiFi using credentials from config file
-//   Periodically polls API for power consumption data
-//   Activates charging when power exceeds threshold for set duration
-//   Deactivates charging when power falls below threshold for set duration
-//
-// Safety Features:
-//   WiFi event handling for connection monitoring
-//   Automatic restart if initial WiFi connection fails
-//   Error handling for HTTP requests
-//   The code is designed for monitoring solar power production and
-//   controlling battery charging based on excess power availability.
-//
 
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -49,15 +28,22 @@
 
 #include "../../config.h"
 
-const int THRESHOLDWATTAGE = 500; // Power threshold in watts
-const int THRESHOLDTIME = 300000; // Time threshold in milliseconds
+// Pin definitions
+const int RELAY_PIN = 19;                 // Digital pin for relay
 
-const int CHARGE_SIGNAL_PIN = 20; // Pin for charging signal
+// Constants
+const float POWER_THRESHOLD = 500.0;      // 500W threshold
+const float CHARGER_CONSUMPTION = 500.0;  // 500W charger consumption
+const unsigned long HYSTERESIS_TIME = 5UL * 60UL * 1000UL;  // 5 minutes in milliseconds
+const unsigned long MEASUREMENT_INTERVAL = 10000UL;         // 10 seconds interval for measurements
 
-unsigned long powerAbove = 0;     // Time power is above threshold
-unsigned long powerBelow = 0;     // Time power is below threshold
-bool isCharging   = false;        // Charging status
+// Variables
+bool chargerOn = false;
+unsigned long lastSwitchTime = 0;
+unsigned long lastMeasurementTime = 0;
+
 bool noconnection = false;        // WiFi connection status
+
 
 //
 // WiFi event handler function for handling WiFi events
@@ -123,13 +109,10 @@ int getHTTP()
     return active_power;
 }
 
-//
-// Setup function
-//
-void setup()
-{
+
+void setup() {
     // Set pin mode for charging signal
-    pinMode(CHARGE_SIGNAL_PIN, OUTPUT);
+    pinMode(RELAY_PIN, OUTPUT);
     // Init Serial port
     Serial.begin(115200);
     // Init WiFI
@@ -154,63 +137,48 @@ void setup()
     Serial.println("");
 }
 
-//
-// Main loop
-//
 void loop()
 {
-    static unsigned long DurationCount = 0;    // Duration counter
-    static unsigned long lastCheck = 0;        // Last time we checked the power
-    const unsigned long CHECK_INTERVAL = 1000; // Check every 1 second
-    // Check if it's time to check the power
-    if (millis() - lastCheck >= CHECK_INTERVAL)
+    unsigned long currentTime = millis();
+    // Check if it's time for a new measurement (every 10 seconds)
+    if (currentTime - lastMeasurementTime >= MEASUREMENT_INTERVAL)
     {
-        lastCheck = millis();
-        // Get the power
-        int power = getHTTP();
-        Serial.print("Power: ");
-        Serial.print(power);
-        Serial.print(" W  ");
-        Serial.print(isCharging);
-        if (isCharging)
+        // Read power from solar panels
+        int solarPower = getHTTP();
+        // DEBUG CHARGER ON SIMULATION
+        if (chargerOn) solarPower = solarPower - CHARGER_CONSUMPTION;
+        // DEBUG CHARGER ON SIMULATION
+        unsigned long currentTime = millis();
+
+        // Check if we need to turn on the charger
+        if (!chargerOn && solarPower >= (POWER_THRESHOLD + CHARGER_CONSUMPTION))
         {
-            Serial.print("  Duration: ");
-            Serial.print(DurationCount++);
-        }
-        Serial.println();
-        // test if power is above or below threshold
-        if (power >= THRESHOLDWATTAGE)
-        {
-            // Reset the below timer if power is restored
-            powerBelow = 0;
-            // If power is above THRESHOLDWATTAGE, start the above timer
-            if (powerAbove == 0)
+            if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
             {
-                powerAbove = millis();
-            }
-            // If power has been above THRESHOLDWATTAGE for THRESHOLDTIME
-            // activate charging signal
-            if (millis() - powerAbove >= THRESHOLDTIME && !isCharging)
-            {
-                digitalWrite(CHARGE_SIGNAL_PIN, HIGH);
-                isCharging = true;
+                digitalWrite(RELAY_PIN, HIGH);  // Turn charger on
+                chargerOn = true;
+                lastSwitchTime = currentTime;
+                Serial.println("Charger ON");
             }
         }
-        else
+        // Check if we need to turn off the charger
+        else if (chargerOn && solarPower < POWER_THRESHOLD)
         {
-            // If power drops below THRESHOLDWATTAGE, start the below timer
-            if (powerBelow == 0)
+            if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
             {
-                powerBelow = millis();
-            }
-            // If power remains below THRESHOLD, deactivate charging signal
-            if (millis() - powerBelow >= THRESHOLDTIME && isCharging)
-            {
-                digitalWrite(CHARGE_SIGNAL_PIN, LOW);
-                isCharging = false;
-                DurationCount = 0;
-                powerAbove = 0; // Reset the above timer
+                digitalWrite(RELAY_PIN, LOW);  // Turn charger off
+                chargerOn = false;
+                lastSwitchTime = currentTime;
+                Serial.println("Charger OFF");
             }
         }
+
+        // Print status for debugging
+        Serial.print("Solar panel power: ");
+        Serial.print(solarPower);
+        Serial.print("W, Charger: ");
+        Serial.println(chargerOn ? "ON" : "OFF");
+
+        lastMeasurementTime = currentTime;  // Update time of last measurement
     }
 }
