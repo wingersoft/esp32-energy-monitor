@@ -14,171 +14,181 @@
 //   Digital output control for charging signal
 //
 
-//#include <Arduino.h>
+#include "../../global_config.h" // hidden passwords config file
+#include "../config.h"
 #include <ArduinoJson.h>
-#include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFi.h>
 
-// Include (hidden) config file to get WiFi credentials and API url
-
-// const char* ssid = "";
-// const char* password = "";
-// const char *mqtt_server = "";
-// const char *apiUrl = "";
-
-#include "../../config.h"
-
-// Pin definitions
-const int RELAY_PIN = 19;                 // Digital pin for relay
-
-// Constants
-const float POWER_THRESHOLD = 500.0;      // 500W threshold
-const float CHARGER_CONSUMPTION = 500.0;  // 500W charger consumption
-const unsigned long HYSTERESIS_TIME = 5UL * 60UL * 1000UL;  // 5 minutes in milliseconds
-const unsigned long MEASUREMENT_INTERVAL = 10000UL;         // 10 seconds interval for measurements
-
-// Variables
-bool chargerOn = false;
-unsigned long lastSwitchTime = 0;
-unsigned long lastMeasurementTime = 0;
-
-bool noconnection = false;        // WiFi connection status
-
+// Global state variables
+bool chargerOn = false;                // Tracks the current state of the charger (on/off)
+unsigned long lastSwitchTime = 0;      // Timestamp of the last time the charger was switched on or off
+unsigned long lastMeasurementTime = 0; // Timestamp of the last power measurement
 
 //
-// WiFi event handler function for handling WiFi events
+// Handles WiFi events like connection and disconnection.
 //
 void WiFiEvent(WiFiEvent_t event)
 {
-    Serial.printf("[WiFi-event] event: %d  - ", event);
+    Serial.printf("[WiFi-event] event: %d\n", event);
     switch (event)
     {
+    // When the ESP32 obtains an IP address, print it to the serial monitor.
     case SYSTEM_EVENT_STA_GOT_IP:
-        Serial.print("WiFi connected - ");
-        Serial.print("IP address: ");
+        Serial.print("WiFi connected. IP address: ");
         Serial.println(WiFi.localIP());
-        noconnection = false;
         break;
+    // If the ESP32 loses connection, it will attempt to reconnect.
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        Serial.println("WiFi lost connection");
-        WiFi.disconnect();
+        Serial.println("WiFi lost connection. Reconnecting...");
         WiFi.begin(ssid, password);
-        noconnection = true;
         break;
-    case SYSTEM_EVENT_STA_START:
-        Serial.println("ESP32 station start");
-        break;
-    case SYSTEM_EVENT_STA_CONNECTED:
-        Serial.println("ESP32 station connected to AP");
+    default:
         break;
     }
 }
 
 //
-// Http request function for getting data from API
+// Fetches the current solar power generation from the API endpoint.
 //
-int getHTTP()
+bool getSolarPower(int &power)
 {
-    int active_power = 0;
-    // Make a HTTP GET request
+    // Check for WiFi connection before making an HTTP request.
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("WiFi not connected. Skipping measurement.");
+        return false;
+    }
+
     HTTPClient http;
-    http.begin(apiUrl);
-    // Send the GET request
-    int httpResponseCode = http.GET();
-    // Check for successful response
+    http.begin(apiUrl);                // Initialize HTTP client with the API URL.
+    int httpResponseCode = http.GET(); // Send a GET request.
+
+    // Check if the request was successful.
     if (httpResponseCode == 200)
     {
-        // Get the response payload
-        String payload = http.getString();
-        // Parse JSON
         JsonDocument doc;
-        // Deserialize JSON
-        deserializeJson(doc, payload);
-        // Access the "active_power_w" value
-        String active = doc["active_power_w"];
-        // Convert to int and invert sign
-        active_power = -active.toInt();
+        // Parse the JSON response from the HTTP stream.
+        DeserializationError error = deserializeJson(doc, http.getStream());
+        if (error)
+        {
+            Serial.print("deserializeJson() failed: ");
+            Serial.println(error.c_str());
+            http.end();
+            return false;
+        }
+        // Extract the power value and negate it to represent solar generation.
+        power = -doc["active_power_w"].as<int>();
     }
     else
     {
         Serial.print("HTTP response error: ");
         Serial.println(httpResponseCode);
+        http.end();
+        return false;
     }
-    // Close the connection
-    http.end();
-    return active_power;
+
+    http.end(); // Free resources.
+    return true;
 }
 
+//
+// Controls the charger relay based on the available solar power.
+//
+void controlCharger(int solarPower)
+{
+    unsigned long currentTime = millis(); // Get the current time.
 
-void setup() {
-    // Set pin mode for charging signal
-    pinMode(RELAY_PIN, OUTPUT);
-    // Init Serial port
-    Serial.begin(115200);
-    // Init WiFI
-    WiFi.enableAP(false);
-    // Handle WiFi event
-    WiFi.onEvent(WiFiEvent);
-    // WiFi mode station
-    WiFi.mode(WIFI_STA);
-    // WiFi connect
-    WiFi.begin(ssid, password);
-    // wait 60 seconds before reboot
-    int trying = 60;
-    while (WiFi.status() != WL_CONNECTED)
+    // If the charger is on, subtract its consumption from the available solar power.
+    if (chargerOn)
+    {
+        solarPower -= CHARGER_CONSUMPTION;
+    }
+
+    // Turn the charger on if there is enough surplus power and the hysteresis time has passed.
+    if (!chargerOn && solarPower >= (POWER_THRESHOLD + CHARGER_CONSUMPTION))
+    {
+        if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
+        {
+            digitalWrite(RELAY_PIN, HIGH); // Turn on the relay.
+            chargerOn = true;
+            lastSwitchTime = currentTime;
+            Serial.println("Charger ON");
+        }
+    }
+    // Turn the charger off if the power drops below the threshold and the hysteresis time has passed.
+    else if (chargerOn && solarPower < POWER_THRESHOLD)
+    {
+        if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
+        {
+            digitalWrite(RELAY_PIN, LOW); // Turn off the relay.
+            chargerOn = false;
+            lastSwitchTime = currentTime;
+            Serial.println("Charger OFF");
+        }
+    }
+}
+
+//
+// Prints the current status of the system to the serial monitor.
+//
+void printStatus(int solarPower)
+{
+    Serial.print("Solar panel power: ");
+    Serial.print(solarPower);
+    Serial.print("W, Charger: ");
+    Serial.println(chargerOn ? "ON" : "OFF");
+}
+
+//
+// Initializes the hardware and software components.
+//
+void setup()
+{
+    pinMode(RELAY_PIN, OUTPUT); // Set the relay pin as an output.
+    Serial.begin(115200);       // Start serial communication for debugging.
+
+    WiFi.onEvent(WiFiEvent);    // Register the WiFi event handler.
+    WiFi.mode(WIFI_STA);        // Set the ESP32 to station mode.
+    WiFi.begin(ssid, password); // Connect to the WiFi network.
+
+    Serial.println("Connecting to WiFi...");
+    int retries = 60;
+    // Wait for the WiFi connection to be established.
+    while (WiFi.status() != WL_CONNECTED && retries > 0)
     {
         Serial.print(".");
         delay(1000);
-        if (trying == 0)
-            ESP.restart();
-        else
-            trying--;
-    } // Start serial communication
-    Serial.println("");
+        retries--;
+    }
+
+    // If the connection fails after multiple retries, restart the ESP32.
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("\nFailed to connect to WiFi. Restarting...");
+        ESP.restart();
+    }
+
+    Serial.println("\nWiFi connected.");
 }
 
+//
+// The main loop of the program, executed repeatedly.
+//
 void loop()
 {
     unsigned long currentTime = millis();
-    // Check if it's time for a new measurement (every 10 seconds)
+    // Periodically measure the solar power and control the charger.
     if (currentTime - lastMeasurementTime >= MEASUREMENT_INTERVAL)
     {
-        // Read power from solar panels
-        int solarPower = getHTTP();
-        // DEBUG CHARGER ON SIMULATION
-        if (chargerOn) solarPower = solarPower - CHARGER_CONSUMPTION;
-        // DEBUG CHARGER ON SIMULATION
-        unsigned long currentTime = millis();
+        lastMeasurementTime = currentTime;
 
-        // Check if we need to turn on the charger
-        if (!chargerOn && solarPower >= (POWER_THRESHOLD + CHARGER_CONSUMPTION))
+        int solarPower = 0;
+        // If the power is successfully fetched, control the charger and print the status.
+        if (getSolarPower(solarPower))
         {
-            if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
-            {
-                digitalWrite(RELAY_PIN, HIGH);  // Turn charger on
-                chargerOn = true;
-                lastSwitchTime = currentTime;
-                Serial.println("Charger ON");
-            }
+            controlCharger(solarPower);
+            printStatus(solarPower);
         }
-        // Check if we need to turn off the charger
-        else if (chargerOn && solarPower < POWER_THRESHOLD)
-        {
-            if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
-            {
-                digitalWrite(RELAY_PIN, LOW);  // Turn charger off
-                chargerOn = false;
-                lastSwitchTime = currentTime;
-                Serial.println("Charger OFF");
-            }
-        }
-
-        // Print status for debugging
-        Serial.print("Solar panel power: ");
-        Serial.print(solarPower);
-        Serial.print("W, Charger: ");
-        Serial.println(chargerOn ? "ON" : "OFF");
-
-        lastMeasurementTime = currentTime;  // Update time of last measurement
     }
 }
