@@ -107,3 +107,26 @@ Feel free to submit issues or pull requests for enhancements, bug fixes, or new 
 ## License
 
 This project is licensed under the MIT License. See the `license.txt` file for details.
+
+## HomeWizard API Documentation
+
+Based on the HomeWizard API documentation, here is a summary of the Recent Measurement API endpoint (`/api/v1/data`).
+
+The `/api/v1/data` endpoint allows you to retrieve the most recent measurement from a supported device. The API does not send data points that are null or unavailable, so your application should be able to handle optional fields.
+
+### Supported Devices
+
+*   **P1 Meter (HWE-P1)**
+---
+
+### P1 Meter (HWE-P1)
+
+Provides detailed smart meter readings.
+
+**Key Parameters:**
+*   `smr_version`: DSMR version of the smart meter.
+*   `total_power_import_kwh`: Total energy usage in kWh.
+*   `total_power_export_kwh`: Total energy feed-in in kWh.
+*   `active_power_w`: Current active power usage in watts.
+*   `active_power_l1_w`, `active_power_l2_w`, `active_power_l3_w`: Active power for each phase.
+---
