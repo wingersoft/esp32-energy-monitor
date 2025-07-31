@@ -28,6 +28,21 @@ This project is an ESP32-based energy monitoring system that retrieves power usa
 
 Install these libraries via the Arduino Library Manager or PlatformIO.
 
+## Configuration
+
+All settings are managed in the `config.h` and `secrets.h` files.
+
+- **`config.h`**:
+  - `RELAY_PIN`: The GPIO pin connected to the relay module.
+  - `POWER_THRESHOLD`: The power threshold (in watts) for turning the charger on or off.
+  - `HYSTERESIS_TIME`: The duration (in milliseconds) that the power threshold must be met before the charger state is changed.
+  - `MEASUREMENT_INTERVAL`: The interval (in milliseconds) at which power data is fetched from the API.
+
+- **`secrets.h`**:
+  - `ssid`: Your WiFi network's SSID.
+  - `password`: Your WiFi network's password.
+  - `apiUrl`: The URL of the energy monitoring API.
+
 ## Setup Instructions
 
 1.  **Clone the Repository**:
@@ -37,21 +52,27 @@ Install these libraries via the Arduino Library Manager or PlatformIO.
     cd esp32-energy-monitor
     ```
 
-2.  **Configure Settings**:
+2.  **Create `secrets.h`**:
 
-    - Open the `config.h` file.
-    - Update the following values:
+    - Create a new file named `secrets.h` in the root directory of the project. You can do this by copying the `secrets.h.example` file:
+      ```bash
+      cp secrets.h.example secrets.h
+      ```
+    - Open `secrets.h` and update the following values:
       - `ssid` and `password` with your WiFi credentials.
       - `apiUrl` with your API endpoint.
-      - (Optional) Adjust `POWER_THRESHOLD`, `HYSTERESIS_TIME`, and other settings as needed.
 
-3.  **Upload the Code**:
+3.  **Configure `config.h` (Optional)**:
+
+    - Open the `config.h` file and adjust the `RELAY_PIN`, `POWER_THRESHOLD`, `HYSTERESIS_TIME`, and `MEASUREMENT_INTERVAL` values as needed.
+
+4.  **Upload the Code**:
 
     - Open the project in your Arduino IDE or PlatformIO.
     - Select your ESP32 board and port.
     - Upload the sketch to your ESP32.
 
-4.  **Monitor Output**:
+5.  **Monitor Output**:
 
     - Open the Serial Monitor at `115200` baud to view connection status, power readings, and debug messages.
 
@@ -66,15 +87,17 @@ Install these libraries via the Arduino Library Manager or PlatformIO.
 ```
 esp32-energy-monitor/
 ├── src/
-│   └── main.cpp      # Main source file with setup() and loop()
-├── config.h          # Centralized configuration file
-├── platformio.ini    # PlatformIO project configuration
-└── README.md         # This file
+│   └── main.cpp          # Main source file with setup() and loop()
+├── config.h              # Centralized configuration file
+├── secrets.h             # WiFi and API credentials
+├── secrets.h.example     # Example for secrets.h
+├── platformio.ini        # PlatformIO project configuration
+└── README.md             # This file
 ```
 
 ## Troubleshooting
 
--   **WiFi Not Connecting**: Double-check the `ssid` and `password` in `config.h`. Ensure your ESP32 is within WiFi range.
+-   **WiFi Not Connecting**: Double-check the `ssid` and `password` in `secrets.h`. Ensure your ESP32 is within WiFi range.
 -   **API Errors**: Verify that the `apiUrl` is correct and returns JSON data in the expected format. Check the Serial Monitor for HTTP error codes.
 
 ## Contributing
