@@ -24,6 +24,8 @@
 bool chargerOn = false;                // Tracks the current state of the charger (on/off)
 unsigned long lastSwitchTime = 0;      // Timestamp of the last time the charger was switched on or off
 unsigned long lastMeasurementTime = 0; // Timestamp of the last power measurement
+unsigned long powerHighStartTime = 0;  // Timestamp when power first exceeded the threshold
+unsigned long powerLowStartTime = 0;   // Timestamp when power first dropped below the threshold
 
 //
 // Handles WiFi events like connection and disconnection.
@@ -99,27 +101,46 @@ void controlCharger(int solarPower)
 {
     unsigned long currentTime = millis(); // Get the current time.
 
-    // Turn the charger on if there is enough surplus power and the hysteresis time has passed.
-    if (!chargerOn && solarPower >= (POWER_THRESHOLD)) // + CHARGER_CONSUMPTION))
+    // Turn the charger on if there is enough surplus power and the condition has been met for the hysteresis time.
+    if (!chargerOn && solarPower >= POWER_THRESHOLD)
     {
-        if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
+        if (powerHighStartTime == 0)
+        {
+            powerHighStartTime = currentTime; // Start the timer
+        }
+        if (currentTime - powerHighStartTime >= HYSTERESIS_TIME)
         {
             digitalWrite(RELAY_PIN, HIGH); // Turn on the relay.
             chargerOn = true;
             lastSwitchTime = currentTime;
+            powerLowStartTime = 0; // Reset the low power timer
             Serial.println("Charger ON");
         }
     }
-    // Turn the charger off if the power drops below the threshold and the hysteresis time has passed.
-    else if (chargerOn && solarPower < POWER_THRESHOLD)
+    else
     {
-        if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
+        powerHighStartTime = 0; // Reset the high power timer
+    }
+
+    // Turn the charger off if the power drops below the threshold and the condition has been met for the hysteresis time.
+    if (chargerOn && solarPower < POWER_THRESHOLD)
+    {
+        if (powerLowStartTime == 0)
+        {
+            powerLowStartTime = currentTime; // Start the timer
+        }
+        if (currentTime - powerLowStartTime >= HYSTERESIS_TIME)
         {
             digitalWrite(RELAY_PIN, LOW); // Turn off the relay.
             chargerOn = false;
             lastSwitchTime = currentTime;
+            powerHighStartTime = 0; // Reset the high power timer
             Serial.println("Charger OFF");
         }
+    }
+    else
+    {
+        powerLowStartTime = 0; // Reset the low power timer
     }
 }
 

@@ -6,7 +6,7 @@ This project is an ESP32-based energy monitoring system that retrieves power usa
 
 - **WiFi Connectivity**: Connects to a WiFi network with automatic reconnection on disconnect.
 - **HTTP Data Retrieval**: Fetches real-time energy data (active power usage) from a specified API.
-- **Intelligent Charging Control**: Controls a battery charger with hysteresis logic to prevent rapid switching.
+- **Intelligent Charging Control**: Controls a battery charger with hysteresis logic. The charger is only activated or deactivated after the power threshold has been met for a specified duration, preventing rapid on/off cycles.
 - **Robust Error Handling**: Includes resilient error handling for network and API interactions.
 - **Centralized Configuration**: All settings are managed in a single `config.h` file.
 
@@ -43,7 +43,7 @@ Install these libraries via the Arduino Library Manager or PlatformIO.
     - Update the following values:
       - `ssid` and `password` with your WiFi credentials.
       - `apiUrl` with your API endpoint.
-      - (Optional) Adjust `POWER_THRESHOLD`, `CHARGER_CONSUMPTION`, and other settings as needed.
+      - (Optional) Adjust `POWER_THRESHOLD`, `HYSTERESIS_TIME`, and other settings as needed.
 
 3.  **Upload the Code**:
 
@@ -59,7 +59,7 @@ Install these libraries via the Arduino Library Manager or PlatformIO.
 
 - On startup, the ESP32 connects to your WiFi network.
 - Every 10 seconds (configurable via `MEASUREMENT_INTERVAL`), it fetches power data from the API.
-- The system intelligently controls the charger based on the available solar power, using a hysteresis timer to prevent rapid on/off cycles.
+- The system intelligently controls the charger based on the available solar power. The charger is only switched on or off after the power threshold has been met for the duration specified by `HYSTERESIS_TIME`.
 
 ## Project Structure
 
