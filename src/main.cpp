@@ -99,14 +99,8 @@ void controlCharger(int solarPower)
 {
     unsigned long currentTime = millis(); // Get the current time.
 
-    // If the charger is on, subtract its consumption from the available solar power.
-    if (chargerOn)
-    {
-        solarPower -= CHARGER_CONSUMPTION;
-    }
-
     // Turn the charger on if there is enough surplus power and the hysteresis time has passed.
-    if (!chargerOn && solarPower >= (POWER_THRESHOLD + CHARGER_CONSUMPTION))
+    if (!chargerOn && solarPower >= (POWER_THRESHOLD)) // + CHARGER_CONSUMPTION))
     {
         if (currentTime - lastSwitchTime >= HYSTERESIS_TIME)
         {
