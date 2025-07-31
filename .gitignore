@@ -8,3 +8,4 @@ __vm/
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .pio
+secrets.h

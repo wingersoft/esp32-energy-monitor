@@ -14,8 +14,8 @@
 //   Digital output control for charging signal
 //
 
-#include "../../global_config.h" // hidden passwords config file
 #include "../config.h"
+#include "../secrets.h"
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
