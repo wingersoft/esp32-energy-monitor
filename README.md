@@ -87,10 +87,10 @@ All settings are managed in the `config.h` and `secrets.h` files.
 ```
 esp32-energy-monitor/
 ├── src/
-│   └── main.cpp          # Main source file with setup() and loop()
-├── config.h              # Centralized configuration file
-├── secrets.h             # WiFi and API credentials
-├── secrets.h.example     # Example for secrets.h
+│   ├── main.cpp          # Main source file with setup() and loop()
+│   ├── config.h          # Centralized configuration file
+│   ├── secrets.h         # WiFi and API credentials
+│   └── secrets.h.example # Example for secrets.h
 ├── platformio.ini        # PlatformIO project configuration
 └── README.md             # This file
 ```

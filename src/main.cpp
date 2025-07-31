@@ -14,8 +14,8 @@
 //   Digital output control for charging signal
 //
 
-#include "../config.h"
-#include "../secrets.h"
+#include "config.h"
+#include "secrets.h"
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
