@@ -19,6 +19,10 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLS, LCD_ROWS);
 
 // Global state variables
 bool chargerOn = false;                // Tracks the current state of the charger (on/off)
@@ -153,6 +157,26 @@ void printStatus(int solarPower)
     Serial.print(solarPower);
     Serial.print("W, Charger: ");
     Serial.println(chargerOn ? "ON" : "OFF");
+
+    lcd.clear();
+    // Row 0: Power and Charger status
+    lcd.setCursor(0, 0);
+    lcd.print("P:");
+    lcd.print(solarPower);
+    lcd.print("W");
+    lcd.setCursor(8, 0);
+    lcd.print("C:");
+    lcd.print(chargerOn ? "On" : "Off");
+
+    // Row 1: Hysteresis and Threshold
+    lcd.setCursor(0, 1);
+    lcd.print("H:");
+    lcd.print(HYSTERESIS_TIME / 1000);
+    lcd.print("s");
+    lcd.setCursor(8, 1);
+    lcd.print("T:");
+    lcd.print((int)POWER_THRESHOLD);
+    lcd.print("W");
 }
 
 //
@@ -162,6 +186,13 @@ void setup()
 {
     pinMode(RELAY_PIN, OUTPUT); // Set the relay pin as an output.
     Serial.begin(115200);       // Start serial communication for debugging.
+
+    // Initialize the LCD
+    Wire.begin();
+    lcd.init();
+    lcd.backlight();
+    lcd.print("Starting...");
+
 
     WiFi.onEvent(WiFiEvent);    // Register the WiFi event handler.
     WiFi.mode(WIFI_STA);        // Set the ESP32 to station mode.

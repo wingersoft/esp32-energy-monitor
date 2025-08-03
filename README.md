@@ -1,12 +1,13 @@
 # ESP32 Energy Monitoring System
 
-This project is an ESP32-based energy monitoring system that retrieves power usage data from an API, processes it, and controls a relay-based battery charging unit. Designed for use with the Arduino framework, this project integrates WiFi and HTTP functionalities.
+This project is an ESP32-based energy monitoring system that retrieves power usage data from a **HomeWizard P1 Meter**, processes it, and controls a relay-based battery charging unit. It also includes an LCD display to show the current solar power and charger status. Designed for use with the Arduino framework, this project integrates WiFi, HTTP, and I2C functionalities.
 
 ## Features
 
 - **WiFi Connectivity**: Connects to a WiFi network with automatic reconnection on disconnect.
-- **HTTP Data Retrieval**: Fetches real-time energy data (active power usage) from a specified API.
+- **HTTP Data Retrieval**: Fetches real-time energy data from a HomeWizard P1 Meter API.
 - **Intelligent Charging Control**: Controls a battery charger with hysteresis logic. The charger is only activated or deactivated after the power threshold has been met for a specified duration, preventing rapid on/off cycles.
+- **LCD Display**: Shows the current solar power and charger status on a 16x2 LCD display.
 - **Robust Error Handling**: Includes resilient error handling for network and API interactions.
 - **Centralized Configuration**: All settings are managed in a single `config.h` file.
 
@@ -15,6 +16,8 @@ This project is an ESP32-based energy monitoring system that retrieves power usa
 - ESP32 microcontroller (e.g., ESP32 DevKit V1)
 - Stable WiFi connection
 - Relay module for charger control
+- 16x2 I2C LCD display
+  - The default I2C pins for the ESP32 are GPIO 21 (SDA) and GPIO 22 (SCL).
 - (Optional) Serial monitor for debugging
 
 ## Software Requirements
@@ -25,6 +28,7 @@ This project is an ESP32-based energy monitoring system that retrieves power usa
   - `ArduinoJson` (for parsing API responses)
   - `WiFi` (for WiFi connectivity)
   - `HTTPClient` (for HTTP requests)
+  - `LiquidCrystal_I2C` (for the LCD display)
 
 Install these libraries via the Arduino Library Manager or PlatformIO.
 
@@ -37,11 +41,14 @@ All settings are managed in the `config.h` and `secrets.h` files.
   - `POWER_THRESHOLD`: The power threshold (in watts) for turning the charger on or off.
   - `HYSTERESIS_TIME`: The duration (in milliseconds) that the power threshold must be met before the charger state is changed.
   - `MEASUREMENT_INTERVAL`: The interval (in milliseconds) at which power data is fetched from the API.
+  - `LCD_ADDRESS`: The I2C address of the LCD display.
+  - `LCD_COLS`: The number of columns on the LCD display.
+  - `LCD_ROWS`: The number of rows on the LCD display.
 
 - **`secrets.h`**:
   - `ssid`: Your WiFi network's SSID.
   - `password`: Your WiFi network's password.
-  - `apiUrl`: The URL of the energy monitoring API.
+  - `apiUrl`: The URL of the HomeWizard P1 Meter API (e.g., `http://<ip-address>/api/v1/data`).
 
 ## Setup Instructions
 
@@ -64,7 +71,7 @@ All settings are managed in the `config.h` and `secrets.h` files.
 
 3.  **Configure `config.h` (Optional)**:
 
-    - Open the `config.h` file and adjust the `RELAY_PIN`, `POWER_THRESHOLD`, `HYSTERESIS_TIME`, and `MEASUREMENT_INTERVAL` values as needed.
+    - Open the `config.h` file and adjust the `RELAY_PIN`, `POWER_THRESHOLD`, `HYSTERESIS_TIME`, `MEASUREMENT_INTERVAL`, `LCD_ADDRESS`, `LCD_COLS`, and `LCD_ROWS` values as needed.
 
 4.  **Upload the Code**:
 
@@ -81,6 +88,14 @@ All settings are managed in the `config.h` and `secrets.h` files.
 - On startup, the ESP32 connects to your WiFi network.
 - Every 10 seconds (configurable via `MEASUREMENT_INTERVAL`), it fetches power data from the API.
 - The system intelligently controls the charger based on the available solar power. The charger is only switched on or off after the power threshold has been met for the duration specified by `HYSTERESIS_TIME`.
+- The LCD display shows the current solar power, charger status, hysteresis time, and power threshold. The layout is as follows:
+
+```
++-----------------+
+|P:234W   C:On    |
+|H:120s   T:1000W |
++-----------------+
+```
 
 ## Project Structure
 
@@ -98,7 +113,8 @@ esp32-energy-monitor/
 ## Troubleshooting
 
 -   **WiFi Not Connecting**: Double-check the `ssid` and `password` in `secrets.h`. Ensure your ESP32 is within WiFi range.
--   **API Errors**: Verify that the `apiUrl` is correct and returns JSON data in the expected format. Check the Serial Monitor for HTTP error codes.
+-   **API Errors**: Verify that the `apiUrl` for your HomeWizard device is correct and returns JSON data in the expected format. Check the Serial Monitor for HTTP error codes.
+-   **LCD Not Working**: Check the I2C address of your LCD and make sure it matches the `LCD_ADDRESS` in `config.h`. Also, check the wiring between the ESP32 and the LCD.
 
 ## Contributing
 
@@ -110,14 +126,11 @@ This project is licensed under the MIT License. See the `license.txt` file for d
 
 ## HomeWizard API Documentation
 
+This project is designed to work with the HomeWizard Energy API.
+
 Based on the HomeWizard API documentation, here is a summary of the Recent Measurement API endpoint (`/api/v1/data`).
 
 The `/api/v1/data` endpoint allows you to retrieve the most recent measurement from a supported device. The API does not send data points that are null or unavailable, so your application should be able to handle optional fields.
-
-### Supported Devices
-
-*   **P1 Meter (HWE-P1)**
----
 
 ### P1 Meter (HWE-P1)
 
