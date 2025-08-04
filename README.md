@@ -44,11 +44,31 @@ All settings are managed in the `config.h` and `secrets.h` files.
   - `LCD_ADDRESS`: The I2C address of the LCD display.
   - `LCD_COLS`: The number of columns on the LCD display.
   - `LCD_ROWS`: The number of rows on the LCD display.
+  - `DIP_PIN_1`, `DIP_PIN_2`, `DIP_PIN_3`: GPIO pins connected to the 3-position DIP switch.
 
 - **`secrets.h`**:
   - `ssid`: Your WiFi network's SSID.
   - `password`: Your WiFi network's password.
   - `apiUrl`: The URL of the HomeWizard P1 Meter API (e.g., `http://<ip-address>/api/v1/data`).
+
+- **DIP Switch Configuration**:
+  - The `HYSTERESIS_TIME` and `POWER_THRESHOLD` can be configured dynamically using a 3-position DIP switch. This allows for easy adjustment without needing to re-flash the firmware.
+  - The DIP switches should be connected to the following GPIO pins:
+    - `DIP_PIN_1`: GPIO 25
+    - `DIP_PIN_2`: GPIO 26
+    - `DIP_PIN_3`: GPIO 23
+  - The following table outlines the settings. A `0` corresponds to the `OFF` position, and a `1` corresponds to the `ON` position.
+
+| DIP 1 | DIP 2 | DIP 3 | Hysteresis Time | Power Threshold |
+| :---: | :---: | :---: | :---: | :---: |
+| 0 | 0 | 0 | 120s | 500W |
+| 0 | 0 | 1 | 120s | 1000W |
+| 0 | 1 | 0 | 120s | 1500W |
+| 0 | 1 | 1 | 120s | 2000W |
+| 1 | 0 | 0 | 240s | 500W |
+| 1 | 0 | 1 | 240s | 1000W |
+| 1 | 1 | 0 | 240s | 1500W |
+| 1 | 1 | 1 | 240s | 2000W |
 
 ## Setup Instructions
 

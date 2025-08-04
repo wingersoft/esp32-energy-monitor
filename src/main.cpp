@@ -18,9 +18,12 @@
 #include "secrets.h"
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <LiquidCrystal_I2C.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+
+extern float POWER_THRESHOLD;
+extern unsigned long HYSTERESIS_TIME;
 
 LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLS, LCD_ROWS);
 
@@ -98,6 +101,45 @@ bool getSolarPower(int &power)
     return true;
 }
 
+void turnChargerOn(unsigned long currentTime)
+{
+    if (powerHighStartTime == 0)
+    {
+        powerHighStartTime = currentTime; // Start the timer
+    }
+    if (currentTime - powerHighStartTime >= HYSTERESIS_TIME)
+    {
+        digitalWrite(RELAY_PIN, HIGH); // Turn on the relay.
+        chargerOn = true;
+        lastSwitchTime = currentTime;
+        powerLowStartTime = 0; // Reset the low power timer
+        Serial.println("Charger ON");
+    }
+}
+
+void turnChargerOff(unsigned long currentTime)
+{
+    // Check if the minimum run time has been met before turning off the charger.
+    if (currentTime - lastSwitchTime < MIN_RUN_TIME)
+    {
+        Serial.println("Minimum run time not met. Charger will remain ON.");
+        return; // Exit without turning off the charger
+    }
+
+    if (powerLowStartTime == 0)
+    {
+        powerLowStartTime = currentTime; // Start the timer
+    }
+    if (currentTime - powerLowStartTime >= HYSTERESIS_TIME)
+    {
+        digitalWrite(RELAY_PIN, LOW); // Turn off the relay.
+        chargerOn = false;
+        lastSwitchTime = currentTime;
+        powerHighStartTime = 0; // Reset the high power timer
+        Serial.println("Charger OFF");
+    }
+}
+
 //
 // Controls the charger relay based on the available solar power.
 //
@@ -108,39 +150,18 @@ void controlCharger(int solarPower)
     // Turn the charger on if there is enough surplus power and the condition has been met for the hysteresis time.
     if (!chargerOn && solarPower >= POWER_THRESHOLD)
     {
-        if (powerHighStartTime == 0)
-        {
-            powerHighStartTime = currentTime; // Start the timer
-        }
-        if (currentTime - powerHighStartTime >= HYSTERESIS_TIME)
-        {
-            digitalWrite(RELAY_PIN, HIGH); // Turn on the relay.
-            chargerOn = true;
-            lastSwitchTime = currentTime;
-            powerLowStartTime = 0; // Reset the low power timer
-            Serial.println("Charger ON");
-        }
+        turnChargerOn(currentTime);
     }
     else
     {
         powerHighStartTime = 0; // Reset the high power timer
     }
 
-    // Turn the charger off if the power drops below the threshold and the condition has been met for the hysteresis time.
+    // Turn the charger off if the power drops below the threshold and the condition has been met for the hysteresis
+    // time.
     if (chargerOn && solarPower < POWER_THRESHOLD)
     {
-        if (powerLowStartTime == 0)
-        {
-            powerLowStartTime = currentTime; // Start the timer
-        }
-        if (currentTime - powerLowStartTime >= HYSTERESIS_TIME)
-        {
-            digitalWrite(RELAY_PIN, LOW); // Turn off the relay.
-            chargerOn = false;
-            lastSwitchTime = currentTime;
-            powerHighStartTime = 0; // Reset the high power timer
-            Serial.println("Charger OFF");
-        }
+        turnChargerOff(currentTime);
     }
     else
     {
@@ -177,6 +198,19 @@ void printStatus(int solarPower)
     lcd.print("T:");
     lcd.print((int)POWER_THRESHOLD);
     lcd.print("W");
+
+    // If the charger is on, display the remaining minimum run time
+    if (chargerOn)
+    {
+        unsigned long remainingTime = (lastSwitchTime + MIN_RUN_TIME - millis()) / 1000;
+        if (remainingTime > 0)
+        {
+            lcd.setCursor(0, 1);
+            lcd.print("Min Run:");
+            lcd.print(remainingTime);
+            lcd.print("s");
+        }
+    }
 }
 
 //
@@ -185,14 +219,63 @@ void printStatus(int solarPower)
 void setup()
 {
     pinMode(RELAY_PIN, OUTPUT); // Set the relay pin as an output.
-    Serial.begin(115200);       // Start serial communication for debugging.
+    pinMode(DIP_PIN_1, INPUT_PULLUP);
+    pinMode(DIP_PIN_2, INPUT_PULLUP);
+    pinMode(DIP_PIN_3, INPUT_PULLUP);
+    Serial.begin(115200); // Start serial communication for debugging.
+
+    // Read DIP switches
+    int dip1 = digitalRead(DIP_PIN_1);
+    int dip2 = digitalRead(DIP_PIN_2);
+    int dip3 = digitalRead(DIP_PIN_3);
+
+    // Set HYSTERESIS_TIME and POWER_THRESHOLD based on DIP switch settings
+    if (dip1 == LOW && dip2 == LOW && dip3 == LOW)
+    {
+        HYSTERESIS_TIME = 120UL * 1000UL;
+        POWER_THRESHOLD = 500.0;
+    }
+    else if (dip1 == LOW && dip2 == LOW && dip3 == HIGH)
+    {
+        HYSTERESIS_TIME = 120UL * 1000UL;
+        POWER_THRESHOLD = 1000.0;
+    }
+    else if (dip1 == LOW && dip2 == HIGH && dip3 == LOW)
+    {
+        HYSTERESIS_TIME = 120UL * 1000UL;
+        POWER_THRESHOLD = 1500.0;
+    }
+    else if (dip1 == LOW && dip2 == HIGH && dip3 == HIGH)
+    {
+        HYSTERESIS_TIME = 120UL * 1000UL;
+        POWER_THRESHOLD = 2000.0;
+    }
+    else if (dip1 == HIGH && dip2 == LOW && dip3 == LOW)
+    {
+        HYSTERESIS_TIME = 240UL * 1000UL;
+        POWER_THRESHOLD = 500.0;
+    }
+    else if (dip1 == HIGH && dip2 == LOW && dip3 == HIGH)
+    {
+        HYSTERESIS_TIME = 240UL * 1000UL;
+        POWER_THRESHOLD = 1000.0;
+    }
+    else if (dip1 == HIGH && dip2 == HIGH && dip3 == LOW)
+    {
+        HYSTERESIS_TIME = 240UL * 1000UL;
+        POWER_THRESHOLD = 1500.0;
+    }
+    else if (dip1 == HIGH && dip2 == HIGH && dip3 == HIGH)
+    {
+        HYSTERESIS_TIME = 240UL * 1000UL;
+        POWER_THRESHOLD = 2000.0;
+    }
 
     // Initialize the LCD
     Wire.begin();
     lcd.init();
     lcd.backlight();
     lcd.print("Starting...");
-
 
     WiFi.onEvent(WiFiEvent);    // Register the WiFi event handler.
     WiFi.mode(WIFI_STA);        // Set the ESP32 to station mode.
