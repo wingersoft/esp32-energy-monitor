@@ -119,13 +119,6 @@ void turnChargerOn(unsigned long currentTime)
 
 void turnChargerOff(unsigned long currentTime)
 {
-    // Check if the minimum run time has been met before turning off the charger.
-    if (currentTime - lastSwitchTime < MIN_RUN_TIME)
-    {
-        Serial.println("Minimum run time not met. Charger will remain ON.");
-        return; // Exit without turning off the charger
-    }
-
     if (powerLowStartTime == 0)
     {
         powerLowStartTime = currentTime; // Start the timer
@@ -185,31 +178,34 @@ void printStatus(int solarPower)
     lcd.print("P:");
     lcd.print(solarPower);
     lcd.print("W");
-    lcd.setCursor(8, 0);
+    lcd.setCursor(9, 0);
     lcd.print("C:");
     lcd.print(chargerOn ? "On" : "Off");
 
-    // Row 1: Hysteresis and Threshold
-    lcd.setCursor(0, 1);
-    lcd.print("H:");
-    lcd.print(HYSTERESIS_TIME / 1000);
-    lcd.print("s");
-    lcd.setCursor(8, 1);
-    lcd.print("T:");
-    lcd.print((int)POWER_THRESHOLD);
-    lcd.print("W");
+    // Row 1: Display countdown or Hysteresis and Threshold
+    bool showCountdown = chargerOn && solarPower < POWER_THRESHOLD && powerLowStartTime > 0;
+    unsigned long elapsedTime = millis() - powerLowStartTime;
 
-    // If the charger is on, display the remaining minimum run time
-    if (chargerOn)
+    if (showCountdown && elapsedTime < HYSTERESIS_TIME)
     {
-        unsigned long remainingTime = (lastSwitchTime + MIN_RUN_TIME - millis()) / 1000;
-        if (remainingTime > 0)
-        {
-            lcd.setCursor(0, 1);
-            lcd.print("Min Run:");
-            lcd.print(remainingTime);
-            lcd.print("s");
-        }
+        unsigned long remainingTime = (HYSTERESIS_TIME - elapsedTime) / 1000;
+        lcd.setCursor(0, 1);
+        lcd.print("                "); // Clear the line
+        lcd.setCursor(0, 1);
+        lcd.print("Off in: ");
+        lcd.print(remainingTime);
+        lcd.print("s");
+    }
+    else
+    {
+        lcd.setCursor(0, 1);
+        lcd.print("H:");
+        lcd.print(HYSTERESIS_TIME / 1000);
+        lcd.print("s");
+        lcd.setCursor(9, 1);
+        lcd.print("T:");
+        lcd.print((int)POWER_THRESHOLD);
+        lcd.print("W");
     }
 }
 

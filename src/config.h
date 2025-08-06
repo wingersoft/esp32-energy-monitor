@@ -43,10 +43,6 @@ float POWER_THRESHOLD = 1000.0;
 // dynamically by the DIP switch settings at startup.
 unsigned long HYSTERESIS_TIME = 2UL * 60UL * 1000UL;
 
-// Minimum time the charger must remain on before it can be turned off.
-// This prevents the charger from cycling on and off too frequently.
-const unsigned long MIN_RUN_TIME = 5UL * 60UL * 1000UL; // 5 minutes
-
 // Interval (in milliseconds) at which power data is fetched from the API.
 const unsigned long MEASUREMENT_INTERVAL = 10000UL; // 10 seconds
 

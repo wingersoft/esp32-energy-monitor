@@ -9,3 +9,4 @@ __vm/
 .vscode/launch.json
 .pio
 secrets.h
+GEMINI.md
