@@ -29,20 +29,6 @@ const int DIP_PIN_3 = 23;   // DIP switch for setting power threshold (500W, 100
 // |   1   |   1   |   1   |      240s       |      2000W      |
 //
 
-// =================================================================
-// Power Configuration
-// =================================================================
-// Default power threshold (in watts). This value is updated dynamically
-// by the DIP switch settings at startup.
-float POWER_THRESHOLD = 1000.0;
-
-// =================================================================
-// Timing Configuration
-// =================================================================
-// Default hysteresis time (in milliseconds). This value is updated
-// dynamically by the DIP switch settings at startup.
-unsigned long HYSTERESIS_TIME = 2UL * 60UL * 1000UL;
-
 // Interval (in milliseconds) at which power data is fetched from the API.
 const unsigned long MEASUREMENT_INTERVAL = 10000UL; // 10 seconds
 

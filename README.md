@@ -38,8 +38,6 @@ All settings are managed in the `config.h` and `secrets.h` files.
 
 - **`config.h`**:
   - `RELAY_PIN`: The GPIO pin connected to the relay module.
-  - `POWER_THRESHOLD`: The power threshold (in watts) for turning the charger on or off.
-  - `HYSTERESIS_TIME`: The duration (in milliseconds) that the power threshold must be met before the charger state is changed.
   - `MEASUREMENT_INTERVAL`: The interval (in milliseconds) at which power data is fetched from the API.
   - `LCD_ADDRESS`: The I2C address of the LCD display.
   - `LCD_COLS`: The number of columns on the LCD display.
@@ -108,12 +106,23 @@ All settings are managed in the `config.h` and `secrets.h` files.
 - On startup, the ESP32 connects to your WiFi network.
 - Every 10 seconds (configurable via `MEASUREMENT_INTERVAL`), it fetches power data from the API.
 - The system intelligently controls the charger based on the available solar power. The charger is only switched on or off after the power threshold has been met for the duration specified by `HYSTERESIS_TIME`.
-- The LCD display shows the current solar power, charger status, hysteresis time, and power threshold. The layout is as follows:
+- The LCD display shows the current solar power, charger status, hysteresis time, and power threshold. When the charger is on and the power is below the threshold, a countdown is displayed to indicate when the charger will turn off. The layout is as follows:
+
+**Normal Mode:**
 
 ```
 +-----------------+
-|P:234W   C:On    |
+|P:1234W  C:Off   |
 |H:120s   T:1000W |
++-----------------+
+```
+
+**Charger Off Countdown:**
+
+```
++-----------------+
+|P:1234W   C:On    |
+|Off in: 87s      |
 +-----------------+
 ```
 
