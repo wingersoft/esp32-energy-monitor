@@ -121,7 +121,7 @@ All settings are managed in the `config.h` and `secrets.h` files.
 
 ```
 +-----------------+
-|P:1234W   C:On    |
+|P:234W   C:On    |
 |Off in: 87s      |
 +-----------------+
 ```
