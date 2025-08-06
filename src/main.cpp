@@ -22,8 +22,8 @@
 #include <WiFi.h>
 #include <Wire.h>
 
-extern float POWER_THRESHOLD;
-extern unsigned long HYSTERESIS_TIME;
+float POWER_THRESHOLD;
+unsigned long HYSTERESIS_TIME;
 
 LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLS, LCD_ROWS);
 
