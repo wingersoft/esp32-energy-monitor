@@ -1,4 +1,4 @@
-//
+// 
 // This code is an ESP32-based controller that manages
 // battery charging based on solar power monitoring.
 //
@@ -14,17 +14,18 @@
 //   Digital output control for charging signal
 //
 
-#include "config.h"
-#include "secrets.h"
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <LiquidCrystal_I2C.h>
-#include <WiFi.h>
-#include <Wire.h>
+#include "config.h"            // Project configuration constants
+#include "secrets.h"           // WiFi credentials and API configuration
+#include <ArduinoJson.h>       // JSON parsing for API responses
+#include <HTTPClient.h>        // HTTP client for API requests
+#include <LiquidCrystal_I2C.h> // LCD display control
+#include <WiFi.h>              // WiFi connectivity
+#include <Wire.h>              // I2C communication for LCD
 
-float POWER_THRESHOLD;
-unsigned long HYSTERESIS_TIME;
+float POWER_THRESHOLD = 1000.0;      // Default power threshold in watts
+unsigned long HYSTERESIS_TIME = 120000UL; // Default hysteresis time in milliseconds (120s)
 
+// Initialize 16x2 I2C LCD display for user interface
 LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLS, LCD_ROWS);
 
 // Global state variables
@@ -33,6 +34,10 @@ unsigned long lastSwitchTime = 0;      // Timestamp of the last time the charger
 unsigned long lastMeasurementTime = 0; // Timestamp of the last power measurement
 unsigned long powerHighStartTime = 0;  // Timestamp when power first exceeded the threshold
 unsigned long powerLowStartTime = 0;   // Timestamp when power first dropped below the threshold
+
+// LCD display buffers to track what's currently shown
+char lcdLine0[LCD_COLS + 1] = "";
+char lcdLine1[LCD_COLS + 1] = "";
 
 //
 // Handles WiFi events like connection and disconnection.
@@ -140,30 +145,73 @@ void controlCharger(int solarPower)
 {
     unsigned long currentTime = millis(); // Get the current time.
 
-    // Turn the charger on if there is enough surplus power and the condition has been met for the hysteresis time.
-    if (!chargerOn && solarPower >= POWER_THRESHOLD)
+    if (!chargerOn)
     {
-        turnChargerOn(currentTime);
+        // Turn the charger on if there is enough surplus power and the condition has been met for the hysteresis time.
+        if (solarPower >= POWER_THRESHOLD)
+        {
+            turnChargerOn(currentTime);
+        }
+        else
+        {
+            powerHighStartTime = 0; // Reset the high power timer
+        }
     }
     else
     {
-        powerHighStartTime = 0; // Reset the high power timer
-    }
-
-    // Turn the charger off if the power drops below the threshold and the condition has been met for the hysteresis
-    // time.
-    if (chargerOn && solarPower < POWER_THRESHOLD)
-    {
-        turnChargerOff(currentTime);
-    }
-    else
-    {
-        powerLowStartTime = 0; // Reset the low power timer
+        // Turn the charger off if the power drops below the threshold and the condition has been met for the hysteresis time.
+        if (solarPower < POWER_THRESHOLD)
+        {
+            turnChargerOff(currentTime);
+        }
+        else
+        {
+            powerLowStartTime = 0; // Reset the low power timer
+        }
     }
 }
 
 //
-// Prints the current status of the system to the serial monitor.
+// Updates a specific line on the LCD if the content has changed.
+//
+void updateLCDLine(int line, const char* text)
+{
+    if (line == 0)
+    {
+        if (strcmp(lcdLine0, text) != 0)
+        {
+            strncpy(lcdLine0, text, LCD_COLS);
+            lcdLine0[LCD_COLS] = '\0'; // Ensure null termination
+            lcd.setCursor(0, 0);
+            lcd.print(text);
+            // Clear the rest of the line if the new text is shorter
+            int len = strlen(text);
+            for (int i = len; i < LCD_COLS; i++)
+            {
+                lcd.print(' ');
+            }
+        }
+    }
+    else if (line == 1)
+    {
+        if (strcmp(lcdLine1, text) != 0)
+        {
+            strncpy(lcdLine1, text, LCD_COLS);
+            lcdLine1[LCD_COLS] = '\0'; // Ensure null termination
+            lcd.setCursor(0, 1);
+            lcd.print(text);
+            // Clear the rest of the line if the new text is shorter
+            int len = strlen(text);
+            for (int i = len; i < LCD_COLS; i++)
+            {
+                lcd.print(' ');
+            }
+        }
+    }
+}
+
+//
+// Prints the current status of the system to the serial monitor and LCD.
 //
 void printStatus(int solarPower)
 {
@@ -172,15 +220,10 @@ void printStatus(int solarPower)
     Serial.print("W, Charger: ");
     Serial.println(chargerOn ? "ON" : "OFF");
 
-    lcd.clear();
     // Row 0: Power and Charger status
-    lcd.setCursor(0, 0);
-    lcd.print("P:");
-    lcd.print(solarPower);
-    lcd.print("W");
-    lcd.setCursor(9, 0);
-    lcd.print("C:");
-    lcd.print(chargerOn ? "On" : "Off");
+    char line0Buffer[LCD_COLS + 1];
+    snprintf(line0Buffer, sizeof(line0Buffer), "P:%dW     C:%s", solarPower, chargerOn ? "On" : "Off");
+    updateLCDLine(0, line0Buffer);
 
     // Row 1: Display countdown or Hysteresis and Threshold
     bool showCountdown = chargerOn && solarPower < POWER_THRESHOLD && powerLowStartTime > 0;
@@ -189,23 +232,15 @@ void printStatus(int solarPower)
     if (showCountdown && elapsedTime < HYSTERESIS_TIME)
     {
         unsigned long remainingTime = (HYSTERESIS_TIME - elapsedTime) / 1000;
-        lcd.setCursor(0, 1);
-        lcd.print("                "); // Clear the line
-        lcd.setCursor(0, 1);
-        lcd.print("Off in: ");
-        lcd.print(remainingTime);
-        lcd.print("s");
+        char line1Buffer[LCD_COLS + 1];
+        snprintf(line1Buffer, sizeof(line1Buffer), "Off in: %lus", remainingTime);
+        updateLCDLine(1, line1Buffer);
     }
     else
     {
-        lcd.setCursor(0, 1);
-        lcd.print("H:");
-        lcd.print(HYSTERESIS_TIME / 1000);
-        lcd.print("s");
-        lcd.setCursor(9, 1);
-        lcd.print("T:");
-        lcd.print((int)POWER_THRESHOLD);
-        lcd.print("W");
+        char line1Buffer[LCD_COLS + 1];
+        snprintf(line1Buffer, sizeof(line1Buffer), "H:%lus   T:%dW", HYSTERESIS_TIME / 1000, (int)POWER_THRESHOLD);
+        updateLCDLine(1, line1Buffer);
     }
 }
 
@@ -220,51 +255,46 @@ void setup()
     pinMode(DIP_PIN_3, INPUT_PULLUP);
     Serial.begin(115200); // Start serial communication for debugging.
 
-    // Read DIP switches
-    int dip1 = digitalRead(DIP_PIN_1);
-    int dip2 = digitalRead(DIP_PIN_2);
-    int dip3 = digitalRead(DIP_PIN_3);
+    // Read DIP switches using bitwise operations for efficiency
+    int dipValue = (digitalRead(DIP_PIN_1) == HIGH ? 4 : 0) |
+                   (digitalRead(DIP_PIN_2) == HIGH ? 2 : 0) |
+                   (digitalRead(DIP_PIN_3) == HIGH ? 1 : 0);
 
     // Set HYSTERESIS_TIME and POWER_THRESHOLD based on DIP switch settings
-    if (dip1 == LOW && dip2 == LOW && dip3 == LOW)
+    switch (dipValue)
     {
+    case 0: // 0 0 0
         HYSTERESIS_TIME = 120UL * 1000UL;
         POWER_THRESHOLD = 500.0;
-    }
-    else if (dip1 == LOW && dip2 == LOW && dip3 == HIGH)
-    {
+        break;
+    case 1: // 0 0 1
         HYSTERESIS_TIME = 120UL * 1000UL;
         POWER_THRESHOLD = 1000.0;
-    }
-    else if (dip1 == LOW && dip2 == HIGH && dip3 == LOW)
-    {
+        break;
+    case 2: // 0 1 0
         HYSTERESIS_TIME = 120UL * 1000UL;
         POWER_THRESHOLD = 1500.0;
-    }
-    else if (dip1 == LOW && dip2 == HIGH && dip3 == HIGH)
-    {
+        break;
+    case 3: // 0 1 1
         HYSTERESIS_TIME = 120UL * 1000UL;
         POWER_THRESHOLD = 2000.0;
-    }
-    else if (dip1 == HIGH && dip2 == LOW && dip3 == LOW)
-    {
+        break;
+    case 4: // 1 0 0
         HYSTERESIS_TIME = 240UL * 1000UL;
         POWER_THRESHOLD = 500.0;
-    }
-    else if (dip1 == HIGH && dip2 == LOW && dip3 == HIGH)
-    {
+        break;
+    case 5: // 1 0 1
         HYSTERESIS_TIME = 240UL * 1000UL;
         POWER_THRESHOLD = 1000.0;
-    }
-    else if (dip1 == HIGH && dip2 == HIGH && dip3 == LOW)
-    {
+        break;
+    case 6: // 1 1 0
         HYSTERESIS_TIME = 240UL * 1000UL;
         POWER_THRESHOLD = 1500.0;
-    }
-    else if (dip1 == HIGH && dip2 == HIGH && dip3 == HIGH)
-    {
+        break;
+    case 7: // 1 1 1
         HYSTERESIS_TIME = 240UL * 1000UL;
         POWER_THRESHOLD = 2000.0;
+        break;
     }
 
     // Initialize the LCD
@@ -295,6 +325,12 @@ void setup()
     }
 
     Serial.println("\nWiFi connected.");
+    
+    // Clear LCD buffers after initial display
+    memset(lcdLine0, ' ', LCD_COLS);
+    memset(lcdLine1, ' ', LCD_COLS);
+    lcdLine0[LCD_COLS] = '\0';
+    lcdLine1[LCD_COLS] = '\0';
 }
 
 //
@@ -315,5 +351,13 @@ void loop()
             controlCharger(solarPower);
             printStatus(solarPower);
         }
+    }
+    
+    // Handle WiFi reconnection in loop as well
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("WiFi disconnected. Attempting to reconnect...");
+        WiFi.reconnect();
+        delay(5000); // Wait a bit before checking again
     }
 }

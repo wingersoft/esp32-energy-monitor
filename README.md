@@ -10,6 +10,7 @@ This project is an ESP32-based energy monitoring system that retrieves power usa
 - **LCD Display**: Shows the current solar power and charger status on a 16x2 LCD display.
 - **Robust Error Handling**: Includes resilient error handling for network and API interactions.
 - **Centralized Configuration**: All settings are managed in a single `config.h` file.
+- **Optimized Performance**: Efficient DIP switch reading, optimized LCD updates, and improved WiFi reconnection logic.
 
 ## Hardware Requirements
 
@@ -144,6 +145,15 @@ esp32-energy-monitor/
 -   **WiFi Not Connecting**: Double-check the `ssid` and `password` in `secrets.h`. Ensure your ESP32 is within WiFi range.
 -   **API Errors**: Verify that the `apiUrl` for your HomeWizard device is correct and returns JSON data in the expected format. Check the Serial Monitor for HTTP error codes.
 -   **LCD Not Working**: Check the I2C address of your LCD and make sure it matches the `LCD_ADDRESS` in `config.h`. Also, check the wiring between the ESP32 and the LCD.
+
+## Optimizations
+
+Recent optimizations have been made to improve the performance and efficiency of the system:
+
+- **Efficient DIP Switch Reading**: The DIP switch reading logic now uses bitwise operations for more efficient configuration.
+- **LCD Update Optimization**: The LCD display now only updates when content changes, reducing unnecessary writes and potentially extending the display's lifespan.
+- **Improved WiFi Reconnection**: Added WiFi reconnection handling in the main loop for better reliability.
+- **Code Structure Improvements**: Streamlined control logic for cleaner, more maintainable code.
 
 ## Contributing
 
